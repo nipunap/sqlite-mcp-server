@@ -29,24 +29,42 @@ func NewServer(manager *db.Manager) (*Server, error) {
 	dbResources := resources.NewDBResources(manager)
 
 	// Register database management tools
-	s.registry.RegisterTool("db/register_database", dbTools.RegisterDatabase, nil)
-	s.registry.RegisterTool("db/list_databases", dbTools.ListDatabases, nil)
+	if err := s.registry.RegisterTool("db/register_database", dbTools.RegisterDatabase, nil); err != nil {
+		return nil, err
+	}
+	if err := s.registry.RegisterTool("db/list_databases", dbTools.ListDatabases, nil); err != nil {
+		return nil, err
+	}
 
 	// Register database operation tools
-	s.registry.RegisterTool("db/get_table_schema", dbTools.GetTableSchema, nil)
-	s.registry.RegisterTool("db/insert_record", dbTools.InsertRecord, nil)
-	s.registry.RegisterTool("db/query", dbTools.ExecuteQuery, nil)
+	if err := s.registry.RegisterTool("db/get_table_schema", dbTools.GetTableSchema, nil); err != nil {
+		return nil, err
+	}
+	if err := s.registry.RegisterTool("db/insert_record", dbTools.InsertRecord, nil); err != nil {
+		return nil, err
+	}
+	if err := s.registry.RegisterTool("db/query", dbTools.ExecuteQuery, nil); err != nil {
+		return nil, err
+	}
 
 	// Register database query tools (previously resources, but they need parameters)
-	s.registry.RegisterTool("db/get_tables", dbResources.GetTables, nil)
-	s.registry.RegisterTool("db/get_schema", dbResources.GetSchema, nil)
+	if err := s.registry.RegisterTool("db/get_tables", dbResources.GetTables, nil); err != nil {
+		return nil, err
+	}
+	if err := s.registry.RegisterTool("db/get_schema", dbResources.GetSchema, nil); err != nil {
+		return nil, err
+	}
 
 	// Register resources (no parameters needed)
-	s.registry.RegisterResource("db/databases", dbResources.GetDatabases)
+	if err := s.registry.RegisterResource("db/databases", dbResources.GetDatabases); err != nil {
+		return nil, err
+	}
 
 	// Register prompts
 	for name, content := range prompts.DBPrompts {
-		s.registry.RegisterPrompt(name, content)
+		if err := s.registry.RegisterPrompt(name, content); err != nil {
+			return nil, err
+		}
 	}
 
 	return s, nil

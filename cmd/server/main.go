@@ -35,12 +35,21 @@ func main() {
 
 	// Create database manager
 	manager := db.NewManager(registry)
-	defer manager.CloseAll()
+	defer func() {
+		if err := manager.CloseAll(); err != nil {
+			log.Printf("Error closing database connections: %v", err)
+		}
+	}()
 
 	// Register default database if provided
 	if *defaultDB != "" {
 		absDefaultDB, err := filepath.Abs(*defaultDB)
 		if err != nil {
+			// Close resources before exiting
+			if closeErr := manager.CloseAll(); closeErr != nil {
+				log.Printf("Error closing connections: %v", closeErr)
+			}
+			registry.Close()
 			log.Fatalf("Failed to resolve default database path: %v", err)
 		}
 
