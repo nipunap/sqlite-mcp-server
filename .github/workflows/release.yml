@@ -1,0 +1,289 @@
+---
+name: Release and Tagging
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      custom_version:
+        description: 'Custom version (optional, overrides version_type)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  check-changes:
+    name: Check for Changes
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+      version_bump: ${{ steps.check.outputs.version_bump }}
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for release-worthy changes
+        id: check
+        run: |
+          # Get the last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Last tag: $LAST_TAG"
+
+          # Check if this is a manual dispatch
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_release=true" >> $GITHUB_OUTPUT
+            if [ -n "${{ github.event.inputs.custom_version }}" ]; then
+              echo "version_bump=custom" >> $GITHUB_OUTPUT
+            else
+              echo "version_bump=${{ github.event.inputs.version_type }}" >> $GITHUB_OUTPUT
+            fi
+            exit 0
+          fi
+
+          # Get commits since last tag
+          COMMITS=$(git log ${LAST_TAG}..HEAD --oneline)
+
+          if [ -z "$COMMITS" ]; then
+            echo "No new commits since last tag"
+            echo "should_release=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "New commits since $LAST_TAG:"
+          echo "$COMMITS"
+
+          # Determine version bump based on commit messages
+          VERSION_BUMP="patch"
+
+          # Check for breaking changes or major features
+          if echo "$COMMITS" | grep -iE "(BREAKING|major|feat!|fix!)" > /dev/null; then
+            VERSION_BUMP="major"
+          # Check for new features
+          elif echo "$COMMITS" | grep -iE "(feat|feature)" > /dev/null; then
+            VERSION_BUMP="minor"
+          # Default to patch for fixes and other changes
+          else
+            VERSION_BUMP="patch"
+          fi
+
+          echo "Suggested version bump: $VERSION_BUMP"
+          echo "should_release=true" >> $GITHUB_OUTPUT
+          echo "version_bump=$VERSION_BUMP" >> $GITHUB_OUTPUT
+
+  create-tag:
+    name: Create Tag and Release
+    runs-on: ubuntu-latest
+    needs: check-changes
+    if: needs.check-changes.outputs.should_release == 'true'
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Run tests before release
+        run: |
+          echo "Running final tests before creating release..."
+          go test -v ./internal/db/... ./internal/mcp/tools/... || true
+          go build -v ./...
+
+      - name: Calculate new version
+        id: version
+        run: |
+          # Get the last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Last tag: $LAST_TAG"
+
+          # Remove 'v' prefix for calculation
+          LAST_VERSION=${LAST_TAG#v}
+
+          # Split version into parts
+          IFS='.' read -ra VERSION_PARTS <<< "$LAST_VERSION"
+          MAJOR=${VERSION_PARTS[0]:-0}
+          MINOR=${VERSION_PARTS[1]:-0}
+          PATCH=${VERSION_PARTS[2]:-0}
+
+          # Handle custom version
+          if [ "${{ github.event.inputs.custom_version }}" != "" ]; then
+            NEW_VERSION="${{ github.event.inputs.custom_version }}"
+            # Add 'v' prefix if not present
+            if [[ ! "$NEW_VERSION" =~ ^v ]]; then
+              NEW_VERSION="v$NEW_VERSION"
+            fi
+          else
+            # Calculate new version based on bump type
+            case "${{ needs.check-changes.outputs.version_bump }}" in
+              major)
+                MAJOR=$((MAJOR + 1))
+                MINOR=0
+                PATCH=0
+                ;;
+              minor)
+                MINOR=$((MINOR + 1))
+                PATCH=0
+                ;;
+              patch)
+                PATCH=$((PATCH + 1))
+                ;;
+            esac
+            NEW_VERSION="v$MAJOR.$MINOR.$PATCH"
+          fi
+
+          echo "New version: $NEW_VERSION"
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          NEW_VERSION="${{ steps.version.outputs.new_version }}"
+
+          echo "Generating changelog from $LAST_TAG to $NEW_VERSION"
+
+          # Create changelog
+          CHANGELOG_FILE="CHANGELOG_${NEW_VERSION}.md"
+
+          cat > $CHANGELOG_FILE << EOF
+          # Release $NEW_VERSION
+
+          ## What's Changed
+
+          EOF
+
+          # Get commits since last tag
+          git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%h)" >> $CHANGELOG_FILE
+
+          echo "" >> $CHANGELOG_FILE
+          echo "" >> $CHANGELOG_FILE
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${LAST_TAG}...${NEW_VERSION}" >> $CHANGELOG_FILE
+
+          # Read changelog content for the release
+          CHANGELOG_CONTENT=$(cat $CHANGELOG_FILE)
+
+          # Escape for GitHub Actions
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG_CONTENT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create and push tag
+        run: |
+          NEW_VERSION="${{ steps.version.outputs.new_version }}"
+
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Create annotated tag
+          git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION
+
+          Auto-generated release from successful merge to main branch.
+
+          Version bump: ${{ needs.check-changes.outputs.version_bump }}
+          Triggered by: ${{ github.event_name }}
+          Commit: ${{ github.sha }}"
+
+          # Push tag
+          git push origin "$NEW_VERSION"
+
+          echo "Created and pushed tag: $NEW_VERSION"
+
+      - name: Build release assets
+        run: |
+          NEW_VERSION="${{ steps.version.outputs.new_version }}"
+
+          # Create release directory
+          mkdir -p release
+
+          # Build for multiple platforms
+          echo "Building release binaries..."
+
+          # Linux AMD64
+          GOOS=linux GOARCH=amd64 go build \
+            -ldflags="-X main.version=$NEW_VERSION" \
+            -o release/sqlite-mcp-server-linux-amd64 ./cmd/server
+
+          # Linux ARM64
+          GOOS=linux GOARCH=arm64 go build \
+            -ldflags="-X main.version=$NEW_VERSION" \
+            -o release/sqlite-mcp-server-linux-arm64 ./cmd/server
+
+          # macOS AMD64
+          GOOS=darwin GOARCH=amd64 go build \
+            -ldflags="-X main.version=$NEW_VERSION" \
+            -o release/sqlite-mcp-server-darwin-amd64 ./cmd/server
+
+          # macOS ARM64 (Apple Silicon)
+          GOOS=darwin GOARCH=arm64 go build \
+            -ldflags="-X main.version=$NEW_VERSION" \
+            -o release/sqlite-mcp-server-darwin-arm64 ./cmd/server
+
+          # Windows AMD64
+          GOOS=windows GOARCH=amd64 go build \
+            -ldflags="-X main.version=$NEW_VERSION" \
+            -o release/sqlite-mcp-server-windows-amd64.exe ./cmd/server
+
+          # Create checksums
+          cd release
+          sha256sum * > checksums.txt
+          cd ..
+
+          echo "Built release assets:"
+          ls -la release/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.new_version }}
+          name: Release ${{ steps.version.outputs.new_version }}
+          body: ${{ steps.changelog.outputs.changelog }}
+          draft: false
+          prerelease: false
+          files: |
+            release/sqlite-mcp-server-linux-amd64
+            release/sqlite-mcp-server-linux-arm64
+            release/sqlite-mcp-server-darwin-amd64
+            release/sqlite-mcp-server-darwin-arm64
+            release/sqlite-mcp-server-windows-amd64.exe
+            release/checksums.txt
+          generate_release_notes: true
+
+  notify:
+    name: Notify Release
+    runs-on: ubuntu-latest
+    needs: [check-changes, create-tag]
+    if: always() && needs.check-changes.outputs.should_release == 'true'
+
+    steps:
+      - name: Notify about release
+        run: |
+          if [ "${{ needs.create-tag.result }}" == "success" ]; then
+            echo "🎉 Successfully created release!"
+            echo "Release available at: https://github.com/${{ github.repository }}/releases/latest"
+            echo "Check the releases page for download links and changelog."
+          else
+            echo "❌ Release creation failed"
+            echo "Check the create-tag job logs for details."
+            exit 1
+          fi

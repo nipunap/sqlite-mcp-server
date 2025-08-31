@@ -76,7 +76,7 @@ func (t *STDIOTransport) WriteMessage(msg *JSONRPCMessage) error {
 	return t.writer.Flush()
 }
 
-// HandleMessages processes incoming messages until context is cancelled
+// HandleMessages processes incoming messages until context is canceled
 func (t *STDIOTransport) HandleMessages(ctx context.Context, handler func(*JSONRPCMessage) *JSONRPCMessage) error {
 	for {
 		select {

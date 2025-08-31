@@ -1,5 +1,9 @@
 # SQLite MCP (Model Context Protocol) Server
 
+[![CI](https://github.com/nipunap/sqlite-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/nipunap/sqlite-mcp-server/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/nipunap/sqlite-mcp-server/branch/main/graph/badge.svg)](https://codecov.io/gh/nipunap/sqlite-mcp-server)
+[![Go Report Card](https://goreportcard.com/badge/github.com/nipunap/sqlite-mcp-server)](https://goreportcard.com/report/github.com/nipunap/sqlite-mcp-server)
+
 A server-side implementation of the Model Context Protocol (MCP) for SQLite databases, enabling AI applications to interact with **multiple SQLite databases** through a standardized protocol. Each database must be registered before use, allowing dynamic database management and multi-database operations.
 
 ## Project Structure

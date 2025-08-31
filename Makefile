@@ -1,4 +1,4 @@
-.PHONY: test coverage coverage-html clean mcp-coverage mcp-coverage-html
+.PHONY: test coverage coverage-html clean mcp-coverage mcp-coverage-html lint lint-fix build ci-setup
 
 # Test all packages
 test:
@@ -35,3 +35,26 @@ test-all: clean test-race coverage coverage-html
 
 # Run MCP tests and generate coverage report
 mcp-test-all: clean mcp-coverage mcp-coverage-html
+
+# Build the server binary
+build:
+	go build -o sqlite-mcp-server ./cmd/server
+
+# Run golangci-lint
+lint:
+	golangci-lint run
+
+# Run golangci-lint with auto-fix
+lint-fix:
+	golangci-lint run --fix
+
+# Setup CI dependencies (install golangci-lint locally)
+ci-setup:
+	@which golangci-lint > /dev/null || (echo "Installing golangci-lint..." && go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)
+
+# Run all CI checks locally
+ci-local: ci-setup lint test-race coverage
+
+# Clean everything including build artifacts
+clean-all: clean
+	rm -f sqlite-mcp-server

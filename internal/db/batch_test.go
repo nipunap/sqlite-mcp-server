@@ -25,7 +25,11 @@ func TestBatchOperations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create registry: %v", err)
 	}
-	defer registry.Close()
+	defer func() {
+		if err := registry.Close(); err != nil {
+			t.Logf("Error closing registry: %v", err)
+		}
+	}()
 
 	// Register test database
 	err = registry.RegisterDatabase(&DatabaseInfo{

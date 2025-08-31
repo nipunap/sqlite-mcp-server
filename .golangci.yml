@@ -1,0 +1,123 @@
+run:
+  timeout: 5m
+  issues-exit-code: 1
+  tests: true
+
+linters:
+  enable:
+    - gofmt
+    - govet
+    - errcheck
+    - staticcheck
+    - unused
+    - gosimple
+    - ineffassign
+    - typecheck
+    - gosec
+    - misspell
+    - gocyclo
+    - dupl
+    - goconst
+    - revive
+    - noctx
+    - rowserrcheck
+    - sqlclosecheck
+    - unparam
+    - gocritic
+    - gci
+    - whitespace
+  disable:
+    - wsl  # Too strict for this codebase style
+  # Note: Deprecated linters (golint, structcheck, varcheck, deadcode, scopelint, exportloopref)
+  # are automatically disabled by golangci-lint
+
+linters-settings:
+  gocyclo:
+    min-complexity: 15
+  dupl:
+    threshold: 100
+  goconst:
+    min-len: 2
+    min-occurrences: 2
+  misspell:
+    locale: US
+  lll:
+    line-length: 120
+  goimports:
+    local-prefixes: github.com/nipunap/sqlite-mcp-server
+  gosec:
+    excludes:
+      - G204 # Subprocess launched with variable
+      - G301 # Expect directory permissions to be 0750 or less
+      - G302 # Expect file permissions to be 0600 or less
+  revive:
+    rules:
+      - name: exported
+        arguments: ["sayRepetitiveInsteadOfStutters"]
+      - name: package-comments
+        disabled: true
+      - name: var-naming
+        arguments: [["ID"], ["VM"]]
+
+issues:
+  exclude-dirs:
+    - vendor
+  exclude-files:
+    - ".*\\.pb\\.go$"
+  exclude-rules:
+    # Exclude some linters from running on tests files.
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+        - gocritic
+    # Exclude known linters from partially hard-to-fix issues
+    - linters:
+        - errcheck
+      text: "Error return value of .((os\\.)?std(out|err)\\..*|.*Close|.*Flush|os\\.Remove(All)?|.*print(f|ln)?|os\\.(Un)?Setenv). is not checked"
+    - linters:
+        - gosec
+      text: "Subprocess launched with variable"
+    - linters:
+        - gosec
+      text: "G204: Subprocess launched with function call as argument or cmd arguments"
+    # Ignore some gocritic checks that are too strict
+    - linters:
+        - gocritic
+      text: "(commentedOutCode|exitAfterDefer)"
+    # Ignore some errcheck issues for defer statements (common pattern)
+    - linters:
+        - errcheck
+      text: "Error return value of.*Rollback.*is not checked"
+    # Ignore some SQL row error checks in test files and main code
+    - path: _test\.go
+      linters:
+        - rowserrcheck
+        - sqlclosecheck
+    - linters:
+        - rowserrcheck
+      text: "rows.Err must be checked"
+    # Ignore SQL injection warnings for dynamic table names (controlled input)
+    - linters:
+        - gosec
+      text: "G201: SQL string formatting"
+    # Ignore variable naming for SQL variables (common abbreviation)
+    - linters:
+        - revive
+      text: "var-naming.*Sql.*should be.*SQL"
+    # Exclude wsl (whitespace) checks that are too strict for this codebase
+    - linters:
+        - wsl
+      text: "(return statements should not be cuddled|assignments should only be cuddled|only one cuddle assignment allowed|declarations should never be cuddled|expressions should not be cuddled|if statements should only be cuddled|for statements should only be cuddled|ranges should only be cuddled|go statements can only invoke|append only allowed to cuddle)"
+
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+output:
+  formats:
+    - format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+  sort-results: true
