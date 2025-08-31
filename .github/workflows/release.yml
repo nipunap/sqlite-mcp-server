@@ -56,16 +56,22 @@ jobs:
             exit 0
           fi
 
-          # Get commits since last tag
-          COMMITS=$(git log ${LAST_TAG}..HEAD --oneline)
-
-          if [ -z "$COMMITS" ]; then
-            echo "No new commits since last tag"
-            echo "should_release=false" >> $GITHUB_OUTPUT
-            exit 0
+          # Get commits since last tag or all commits if no tags exist
+          if git describe --tags --abbrev=0 >/dev/null 2>&1; then
+            # There are existing tags
+            COMMITS=$(git log ${LAST_TAG}..HEAD --oneline)
+            if [ -z "$COMMITS" ]; then
+              echo "No new commits since last tag"
+              echo "should_release=false" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            echo "New commits since $LAST_TAG:"
+          else
+            # No existing tags, get all commits
+            COMMITS=$(git log --oneline)
+            echo "No existing tags found. All commits:"
           fi
 
-          echo "New commits since $LAST_TAG:"
           echo "$COMMITS"
 
           # Determine version bump based on commit messages
@@ -172,12 +178,24 @@ jobs:
 
           EOF
 
-          # Get commits since last tag
-          git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%h)" >> $CHANGELOG_FILE
+          # Get commits since last tag or all commits if no tags exist
+          if git describe --tags --abbrev=0 >/dev/null 2>&1; then
+            # There are existing tags
+            git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%h)" >> $CHANGELOG_FILE
+          else
+            # No existing tags, get all commits
+            git log --pretty=format:"- %s (%h)" >> $CHANGELOG_FILE
+          fi
 
           echo "" >> $CHANGELOG_FILE
           echo "" >> $CHANGELOG_FILE
-          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${LAST_TAG}...${NEW_VERSION}" >> $CHANGELOG_FILE
+
+          # Generate appropriate changelog link
+          if git describe --tags --abbrev=0 >/dev/null 2>&1; then
+            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${LAST_TAG}...${NEW_VERSION}" >> $CHANGELOG_FILE
+          else
+            echo "**Full Changelog**: https://github.com/${{ github.repository }}/commits/${NEW_VERSION}" >> $CHANGELOG_FILE
+          fi
 
           # Read changelog content for the release
           CHANGELOG_CONTENT=$(cat $CHANGELOG_FILE)
