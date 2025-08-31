@@ -2,6 +2,8 @@ package resources
 
 import (
 	"database/sql"
+	"fmt"
+	"os"
 	"testing"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -18,8 +20,14 @@ func setupTestDB(t *testing.T) (*db.Manager, func()) {
 	// Create manager
 	manager := db.NewManager(registry)
 
-	// Create test database file for proper registration
-	testDBPath := "/tmp/test_db_resources_" + t.Name() + ".db"
+	// Create a temporary file for testing
+	tempFile, err := os.CreateTemp("", fmt.Sprintf("test_db_resources_%s_*.db", t.Name()))
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	tempFile.Close() // Close immediately, we just need the path
+	testDBPath := tempFile.Name()
+
 	testDB, err := sql.Open("sqlite3", testDBPath)
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
@@ -71,12 +79,15 @@ func setupTestDB(t *testing.T) (*db.Manager, func()) {
 		if err := registry.Close(); err != nil {
 			t.Logf("Error closing registry: %v", err)
 		}
+		os.Remove(testDBPath) // Clean up temp file
 	}
 
 	return manager, cleanup
 }
 
 func TestGetTables(t *testing.T) {
+	t.Parallel()
+
 	manager, cleanup := setupTestDB(t)
 	defer cleanup()
 
@@ -116,6 +127,8 @@ func TestGetTables(t *testing.T) {
 }
 
 func TestGetSchema(t *testing.T) {
+	t.Parallel()
+
 	manager, cleanup := setupTestDB(t)
 	defer cleanup()
 
