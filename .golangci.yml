@@ -1,0 +1,83 @@
+run:
+  timeout: 5m
+  issues-exit-code: 1
+  tests: true
+  skip-dirs:
+    - vendor
+  skip-files:
+    - ".*\\.pb\\.go$"
+
+linters:
+  enable:
+    - gofmt
+    - golint
+    - govet
+    - errcheck
+    - staticcheck
+    - unused
+    - gosimple
+    - structcheck
+    - varcheck
+    - ineffassign
+    - deadcode
+    - typecheck
+    - gosec
+    - misspell
+    - gocyclo
+    - dupl
+    - goconst
+    - goimports
+    - revive
+    - exportloopref
+    - noctx
+    - rowserrcheck
+    - sqlclosecheck
+    - unparam
+
+linters-settings:
+  gocyclo:
+    min-complexity: 15
+  dupl:
+    threshold: 100
+  goconst:
+    min-len: 2
+    min-occurrences: 2
+  misspell:
+    locale: US
+  lll:
+    line-length: 120
+  goimports:
+    local-prefixes: github.com/nipunap/sqlite-mcp-server
+  gosec:
+    excludes:
+      - G204 # Subprocess launched with variable
+      - G301 # Expect directory permissions to be 0750 or less
+      - G302 # Expect file permissions to be 0600 or less
+
+issues:
+  exclude-rules:
+    # Exclude some linters from running on tests files.
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+    # Exclude known linters from partially hard-to-fix issues
+    - linters:
+        - errcheck
+      text: "Error return value of .((os\\.)?std(out|err)\\..*|.*Close|.*Flush|os\\.Remove(All)?|.*print(f|ln)?|os\\.(Un)?Setenv). is not checked"
+    - linters:
+        - gosec
+      text: "Subprocess launched with variable"
+    - linters:
+        - gosec
+      text: "G204: Subprocess launched with function call as argument or cmd arguments"
+
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
