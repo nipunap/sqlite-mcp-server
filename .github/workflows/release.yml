@@ -71,7 +71,7 @@ jobs:
             COMMITS=$(git log --oneline)
             echo "No existing tags found. All commits:"
           fi
-          
+
           echo "$COMMITS"
 
           # Determine version bump based on commit messages
@@ -189,7 +189,7 @@ jobs:
 
           echo "" >> $CHANGELOG_FILE
           echo "" >> $CHANGELOG_FILE
-          
+
           # Generate appropriate changelog link
           if git describe --tags --abbrev=0 >/dev/null 2>&1; then
             echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${LAST_TAG}...${NEW_VERSION}" >> $CHANGELOG_FILE
