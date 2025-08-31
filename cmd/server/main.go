@@ -31,7 +31,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create database registry: %v", err)
 	}
-	defer registry.Close()
+	defer func() {
+		if err := registry.Close(); err != nil {
+			log.Printf("Error closing registry: %v", err)
+		}
+	}()
 
 	// Create database manager
 	manager := db.NewManager(registry)
@@ -49,7 +53,9 @@ func main() {
 			if closeErr := manager.CloseAll(); closeErr != nil {
 				log.Printf("Error closing connections: %v", closeErr)
 			}
-			registry.Close()
+			if closeErr := registry.Close(); closeErr != nil {
+				log.Printf("Error closing registry: %v", closeErr)
+			}
 			log.Fatalf("Failed to resolve default database path: %v", err)
 		}
 

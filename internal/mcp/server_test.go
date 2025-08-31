@@ -57,8 +57,12 @@ func setupTestManager(t *testing.T) (*db.Manager, func()) {
 	}
 
 	cleanup := func() {
-		manager.CloseAll()
-		registry.Close()
+		if err := manager.CloseAll(); err != nil {
+			t.Logf("Error closing manager: %v", err)
+		}
+		if err := registry.Close(); err != nil {
+			t.Logf("Error closing registry: %v", err)
+		}
 		os.Remove(testDBPath) // Clean up temp file
 	}
 
