@@ -31,9 +31,10 @@ This workflow runs on:
    - Depends on test and lint jobs passing
 
 4. **Security** - Security scanning
-   - Runs Gosec security scanner
-   - Uploads results to GitHub Security tab
-   - Scans for common security vulnerabilities
+   - Runs Gosec security scanner using `securego/gosec` action
+   - Uploads SARIF results to GitHub Security tab
+   - Scans Go code for common security vulnerabilities
+   - Downloads dependencies before scanning
 
 5. **Status Check** - PR status summary
    - Summarizes all job results for PR requirements
@@ -152,6 +153,27 @@ The CI workflow includes several PR-specific enhancements:
 - Codecov integration provides detailed coverage tracking
 - HTML coverage reports are generated locally with `make coverage-html`
 - Coverage changes are tracked and reported on PRs
+
+## Troubleshooting
+
+### Common Issues
+
+**1. Security Action Not Found**
+- **Issue**: `Error: Unable to resolve action securecodewarrior/github-action-gosec`
+- **Solution**: Use `securego/gosec@master` instead (already fixed in current config)
+
+**2. golangci-lint Configuration Errors**
+- **Issue**: `additional properties 'skip-dirs', 'skip-files' not allowed`
+- **Solution**: Use `issues.exclude-dirs` and `issues.exclude-files` instead
+
+**3. Deprecated Linters**
+- **Issue**: Warnings about deprecated linters like `exportloopref`, `golint`
+- **Solution**: Remove from configuration (automatically disabled in modern versions)
+
+**4. Test Failures (RESOLVED)**
+- ✅ **Fixed**: `internal/mcp/server_test.go` - Updated to use proper MCP message structure
+- ⚠️ **Remaining**: `internal/mcp/resources/db_resources_test.go` may have database setup conflicts
+- CI now runs all tests without workarounds
 
 ## Badge Status
 

@@ -51,10 +51,9 @@ jobs:
 
     - name: Run tests
       run: |
-        # TODO: Fix broken tests in internal/mcp/server_test.go and internal/mcp/resources/db_resources_test.go
-        # For now, run tests that pass and continue on failures
-        go test -v -race -coverprofile=coverage.out ./internal/db/... ./internal/mcp/tools/... || true
-        go test -v -race ./... || echo "Some tests failed but CI continues - tests need to be fixed"
+        # Run all tests with coverage
+        go test -v -race -coverprofile=coverage.out ./...
+        echo "All tests completed"
 
     - name: Generate coverage report
       run: go tool cover -html=coverage.out -o coverage.html
@@ -183,8 +182,11 @@ jobs:
       with:
         go-version: '1.23'
 
+    - name: Download dependencies
+      run: go mod download
+
     - name: Run Gosec Security Scanner
-      uses: securecodewarrior/github-action-gosec@master
+      uses: securego/gosec@master
       with:
         args: '-no-fail -fmt sarif -out results.sarif ./...'
 
